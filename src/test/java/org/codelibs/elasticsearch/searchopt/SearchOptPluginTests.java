@@ -2,7 +2,15 @@ package org.codelibs.elasticsearch.searchopt;
 
 import static org.codelibs.elasticsearch.runner.ElasticsearchClusterRunner.newConfigs;
 
+import java.io.IOException;
+import java.util.Map;
+
+import org.codelibs.curl.CurlResponse;
 import org.codelibs.elasticsearch.runner.ElasticsearchClusterRunner;
+import org.codelibs.elasticsearch.runner.net.EcrCurl;
+import org.elasticsearch.action.DocWriteResponse.Result;
+import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.settings.Settings.Builder;
 import org.elasticsearch.node.Node;
 
@@ -41,24 +49,48 @@ public class SearchOptPluginTests extends TestCase {
 
     public void test_plugin() throws Exception {
         final Node node = runner.node();
-        final String index = "test_index";
+        final String index1 = "test_index1";
+        final String index2 = "test_index2";
+        final String type = "_doc";
 
-        /*
-        try (CurlResponse curlResponse = EcrCurl.get(node, "/" + index + "/_queryRewriter").execute()) {
-            final String content = curlResponse.getContentAsString();
-            assertNotNull(content);
-            final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
-            assertEquals(index, contentMap.get("index"));
-            assertTrue(contentMap.get("description").toString().startsWith("This is a elasticsearch-searchopt response:"));
+        runner.createIndex(index1, Settings.builder().put(SearchOptimizer.MIN_TOTAL_SETTING.getKey(), 10)
+                .put(SearchOptimizer.QUERY_NEW_INDEX_SETTING.getKey(), index2).build());
+        runner.createIndex(index2, (Settings) null);
+        runner.refresh();
+
+        // create 1000 documents
+        for (int i = 1; i <= 1000; i++) {
+            final IndexResponse indexResponse1 =
+                    runner.insert(index1, type, String.valueOf(i), "{\"msg\":\"test a" + i + " b" + (i % 10) + " c" + (i % 100) + "\"}");
+            assertEquals(Result.CREATED, indexResponse1.getResult());
         }
 
-        try (CurlResponse curlResponse = EcrCurl.get(node, "/_queryRewriter").execute()) {
-            final String content = curlResponse.getContentAsString();
-            assertNotNull(content);
-            final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
-            assertFalse(contentMap.containsKey("index"));
-            assertTrue(contentMap.get("description").toString().startsWith("This is a elasticsearch-searchopt response:"));
+        // create 1000 documents
+        for (int i = 1; i <= 1000; i++) {
+            final IndexResponse indexResponse1 =
+                    runner.insert(index2, type, String.valueOf(i), "{\"msg\":\"test a" + i + " b" + (i % 5) + " c" + (i % 50) + "\"}");
+            assertEquals(Result.CREATED, indexResponse1.getResult());
         }
-        */
+        runner.refresh();
+
+        assertSearchResult(1L, node, index1, "msg:a1");
+        assertSearchResult(100L, node, index1, "msg:b1");
+        assertSearchResult(10L, node, index1, "msg:c1");
+
+        try (CurlResponse curlResponse = EcrCurl.put(node, "/" + index1 + "/_settings").header("Content-Type", "application/json")
+                .body("{\"index.searchopt.min_total\":11}").execute()) {
+            assertEquals(200, curlResponse.getHttpStatusCode());
+        }
+
+        assertSearchResult(1L, node, index1, "msg:a1");
+        assertSearchResult(100L, node, index1, "msg:b1");
+        assertSearchResult(20L, node, index1, "msg:c1");
+    }
+
+    private void assertSearchResult(final long expect, final Node node, final String index, final String query) throws IOException {
+        try (CurlResponse curlResponse = EcrCurl.get(node, "/" + index + "/_search").param("q", query).execute()) {
+            final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
+            assertEquals(expect, Long.parseLong(((Map<String, Object>) contentMap.get("hits")).get("total").toString()));
+        }
     }
 }

@@ -18,8 +18,8 @@ public class SearchOptActionFilter implements ActionFilter {
     }
 
     @Override
-    public <REQUEST extends ActionRequest, RESPONSE extends ActionResponse> void apply(Task task, String action, REQUEST request,
-            ActionListener<RESPONSE> listener, ActionFilterChain<REQUEST, RESPONSE> chain) {
+    public <REQUEST extends ActionRequest, RESPONSE extends ActionResponse> void apply(final Task task, final String action, final REQUEST request,
+            final ActionListener<RESPONSE> listener, final ActionFilterChain<REQUEST, RESPONSE> chain) {
         if (searchOptimizer == null) {
             chain.proceed(task, action, request, listener);
             return;
@@ -28,7 +28,7 @@ public class SearchOptActionFilter implements ActionFilter {
         searchOptimizer.process(task, action, request, listener, chain);
     }
 
-    public void setSearchOptimizer(SearchOptimizer searchOptimizer) {
+    public void setSearchOptimizer(final SearchOptimizer searchOptimizer) {
         this.searchOptimizer = searchOptimizer;
     }
 
