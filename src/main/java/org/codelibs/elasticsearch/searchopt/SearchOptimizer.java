@@ -72,6 +72,11 @@ public class SearchOptimizer {
         }
 
         final IndexMetaData indexMeta = clusterService.state().getMetaData().index(indices[0]);
+        if (indexMeta == null) {
+            chain.proceed(task, action, request, listener);
+            return;
+        }
+
         final Settings settings = indexMeta.getSettings();
         final long minTotal = MIN_TOTAL_SETTING.get(settings).longValue();
         if (minTotal == 0L) {
