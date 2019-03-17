@@ -1,4 +1,4 @@
-package org.codelibs.elasticsearch.queryrewriter;
+package org.codelibs.elasticsearch.searchopt;
 
 import static org.codelibs.elasticsearch.runner.ElasticsearchClusterRunner.newConfigs;
 
@@ -8,7 +8,7 @@ import org.elasticsearch.node.Node;
 
 import junit.framework.TestCase;
 
-public class QueryRewriterPluginTests extends TestCase {
+public class SearchOptPluginTests extends TestCase {
 
     private ElasticsearchClusterRunner runner;
 
@@ -25,7 +25,7 @@ public class QueryRewriterPluginTests extends TestCase {
                 settingsBuilder.putList("discovery.zen.ping.unicast.hosts", "localhost:9301-9310");
             }
         }).build(newConfigs().clusterName("es-cl-run-" + System.currentTimeMillis())
-                .pluginTypes("org.codelibs.elasticsearch.queryrewriter.QueryRewriterPlugin").numOfNode(3));
+                .pluginTypes("org.codelibs.elasticsearch.searchopt.SearchOptPlugin").numOfNode(3));
 
         // wait for yellow status
         runner.ensureYellow();
@@ -49,7 +49,7 @@ public class QueryRewriterPluginTests extends TestCase {
             assertNotNull(content);
             final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
             assertEquals(index, contentMap.get("index"));
-            assertTrue(contentMap.get("description").toString().startsWith("This is a elasticsearch-query-rewriter response:"));
+            assertTrue(contentMap.get("description").toString().startsWith("This is a elasticsearch-searchopt response:"));
         }
 
         try (CurlResponse curlResponse = EcrCurl.get(node, "/_queryRewriter").execute()) {
@@ -57,7 +57,7 @@ public class QueryRewriterPluginTests extends TestCase {
             assertNotNull(content);
             final Map<String, Object> contentMap = curlResponse.getContent(EcrCurl.jsonParser);
             assertFalse(contentMap.containsKey("index"));
-            assertTrue(contentMap.get("description").toString().startsWith("This is a elasticsearch-query-rewriter response:"));
+            assertTrue(contentMap.get("description").toString().startsWith("This is a elasticsearch-searchopt response:"));
         }
         */
     }
