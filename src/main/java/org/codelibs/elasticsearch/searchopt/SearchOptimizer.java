@@ -98,6 +98,7 @@ public class SearchOptimizer {
             }
             bulkRequest.requests().clear();
             bulkRequest.requests().addAll(requests);
+            chain.proceed(task, action, request, listener);
         } else {
             chain.proceed(task, action, request, listener);
         }
