@@ -1,16 +1,30 @@
 package org.codelibs.elasticsearch.searchopt;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import org.codelibs.elasticsearch.searchopt.stats.SearchStats;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.ActionRequest;
 import org.elasticsearch.action.ActionResponse;
+import org.elasticsearch.action.DocWriteRequest;
+import org.elasticsearch.action.bulk.BulkAction;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.delete.DeleteRequest;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchAction;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.ActionFilterChain;
+import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.cluster.service.ClusterService;
+import org.elasticsearch.common.io.stream.InputStreamStreamInput;
+import org.elasticsearch.common.io.stream.OutputStreamStreamOutput;
 import org.elasticsearch.common.metrics.CounterMetric;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Setting.Property;
@@ -58,6 +72,32 @@ public class SearchOptimizer {
             @SuppressWarnings("unchecked")
             ActionFilterChain<SearchRequest, SearchResponse> c = (ActionFilterChain<SearchRequest, SearchResponse>) chain;
             processSearch(task, action, (SearchRequest) request, l, c);
+        } else if (BulkAction.NAME.equals(action)) {
+            BulkRequest bulkRequest = (BulkRequest) request;
+            List<DocWriteRequest<?>> requests = new ArrayList<>();
+            for (DocWriteRequest<?> req : bulkRequest.requests()) {
+                if (req instanceof IndexRequest) {
+                    IndexRequest indexRequest = (IndexRequest) req;
+                    Map<String, Object> sourceAsMap = indexRequest.sourceAsMap();
+                    // TODO ...
+                    requests.add(req); // TODO replace with a new one if ...
+                    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                        indexRequest.writeTo(new OutputStreamStreamOutput(out));
+                        IndexRequest newRequest = new IndexRequest();
+                        newRequest.readFrom(new InputStreamStreamInput(new ByteArrayInputStream(out.toByteArray())));
+                        // TODO newRequest.index("newname");
+                        requests.add(newRequest);
+                    } catch (Exception e) {
+                        // TODO ...
+                    }
+                } else if (req instanceof UpdateRequest) {
+                    requests.add(req);
+                } else if (req instanceof DeleteRequest) {
+                    requests.add(req);
+                }
+            }
+            bulkRequest.requests().clear();
+            bulkRequest.requests().addAll(requests);
         } else {
             chain.proceed(task, action, request, listener);
         }
